@@ -131,7 +131,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                                 final idx = updated.indexWhere((p) => p.id == current.id);
                                 if (idx == -1) return;
 
-                                // ✅ Batch 13: use logMinutes (single source of truth)
+                                // ✅ use logMinutes (single source of truth)
                                 updated[idx].logMinutes(
                                   dayNumber: safeDay,
                                   minutes: 15,
@@ -360,18 +360,14 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
 
           final todayDay = updated[idx].dayNumberFor(DateTime.now());
 
-          // ✅ Batch 13: use logMinutes
-          if (minutesToAdd > 0 &&
-              todayDay >= 1 &&
-              todayDay <= updated[idx].durationDays) {
+          // ✅ use logMinutes
+          if (minutesToAdd > 0 && todayDay >= 1 && todayDay <= updated[idx].durationDays) {
             updated[idx].logMinutes(
               dayNumber: todayDay,
               minutes: minutesToAdd,
               prayedAt: DateTime.now(),
             );
-          } else if (seconds > 0 &&
-              todayDay >= 1 &&
-              todayDay <= updated[idx].durationDays) {
+          } else if (seconds > 0 && todayDay >= 1 && todayDay <= updated[idx].durationDays) {
             updated[idx].markDayPrayed(todayDay);
             updated[idx].lastPrayedAt = DateTime.now();
           }
@@ -465,7 +461,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
 
           final safeDay = chosenDay.clamp(1, maxDay);
 
-          // ✅ Batch 13: use logMinutes
+          // ✅ use logMinutes
           updated[idx].logMinutes(
             dayNumber: safeDay,
             minutes: chosenMinutes,
@@ -572,7 +568,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
 
           if (ok != true) return;
 
-          // ✅ Batch 13: use logMinutes
+          // ✅ use logMinutes
           updated[idx].logMinutes(
             dayNumber: chosenDay,
             minutes: chosenMinutes,
@@ -596,6 +592,11 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
           appBar: AppBar(
             title: Text(current.title),
             actions: [
+              IconButton(
+                tooltip: 'Jump to notes',
+                icon: const Icon(Icons.notes),
+                onPressed: () => WidgetsBinding.instance.addPostFrameCallback((_) => _jumpToNotes()),
+              ),
               IconButton(
                 tooltip: current.isArchived ? 'Unarchive' : 'Archive',
                 icon: Icon(current.isArchived ? Icons.unarchive : Icons.archive_outlined),
@@ -784,6 +785,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                         ),
                         const SizedBox(height: 10),
+
                         DropdownMenu<int>(
                           initialSelection: (current.prayedDays.contains(_selectedDay))
                               ? _selectedDay
@@ -801,7 +803,9 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                             if (v != null) setState(() => _selectedDay = v);
                           },
                         ),
+
                         const SizedBox(height: 10),
+
                         TextField(
                           controller: _noteCtrl,
                           decoration: const InputDecoration(
@@ -811,7 +815,9 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                           minLines: 2,
                           maxLines: 5,
                         ),
+
                         const SizedBox(height: 10),
+
                         Align(
                           alignment: Alignment.centerRight,
                           child: ElevatedButton.icon(
@@ -820,7 +826,9 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                             label: const Text('Save note'),
                           ),
                         ),
+
                         const SizedBox(height: 10),
+
                         if (availableDays.isEmpty)
                           const Text(
                             'No prayed days yet. Once you record time, days will appear here.',
