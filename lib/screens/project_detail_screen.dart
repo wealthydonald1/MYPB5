@@ -118,7 +118,6 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                 Text('Minutes: ${minsForDay()}'),
                 Text('Notes: ${notesCount()}'),
                 const SizedBox(height: 14),
-
                 Row(
                   children: [
                     Expanded(
@@ -128,14 +127,16 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                         onPressed: current.isArchived
                             ? null
                             : () async {
-                                // ✅ update project minutes safely
                                 final updated = [...widget.projects];
                                 final idx = updated.indexWhere((p) => p.id == current.id);
                                 if (idx == -1) return;
 
-                                updated[idx].totalMinutesPrayed += 15;
-                                updated[idx].addMinutesForDay(safeDay, 15);
-                                updated[idx].lastPrayedAt = DateTime.now();
+                                // ✅ Batch 13: use logMinutes (single source of truth)
+                                updated[idx].logMinutes(
+                                  dayNumber: safeDay,
+                                  minutes: 15,
+                                  prayedAt: DateTime.now(),
+                                );
 
                                 await widget.onProjectsUpdated(updated);
 
@@ -359,19 +360,23 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
 
           final todayDay = updated[idx].dayNumberFor(DateTime.now());
 
+          // ✅ Batch 13: use logMinutes
           if (minutesToAdd > 0 &&
               todayDay >= 1 &&
               todayDay <= updated[idx].durationDays) {
-            updated[idx].totalMinutesPrayed += minutesToAdd;
-            updated[idx].addMinutesForDay(todayDay, minutesToAdd);
+            updated[idx].logMinutes(
+              dayNumber: todayDay,
+              minutes: minutesToAdd,
+              prayedAt: DateTime.now(),
+            );
           } else if (seconds > 0 &&
               todayDay >= 1 &&
               todayDay <= updated[idx].durationDays) {
             updated[idx].markDayPrayed(todayDay);
+            updated[idx].lastPrayedAt = DateTime.now();
           }
 
           updated[idx].carrySeconds = remainderSeconds;
-          updated[idx].lastPrayedAt = DateTime.now();
 
           await widget.onProjectsUpdated(updated);
 
@@ -460,9 +465,12 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
 
           final safeDay = chosenDay.clamp(1, maxDay);
 
-          updated[idx].totalMinutesPrayed += chosenMinutes;
-          updated[idx].addMinutesForDay(safeDay, chosenMinutes);
-          updated[idx].lastPrayedAt = DateTime.now();
+          // ✅ Batch 13: use logMinutes
+          updated[idx].logMinutes(
+            dayNumber: safeDay,
+            minutes: chosenMinutes,
+            prayedAt: DateTime.now(),
+          );
 
           await widget.onProjectsUpdated(updated);
           _snack('Added $chosenMinutes min to Day $safeDay.');
@@ -564,9 +572,12 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
 
           if (ok != true) return;
 
-          updated[idx].totalMinutesPrayed += chosenMinutes;
-          updated[idx].addMinutesForDay(chosenDay, chosenMinutes);
-          updated[idx].lastPrayedAt = DateTime.now();
+          // ✅ Batch 13: use logMinutes
+          updated[idx].logMinutes(
+            dayNumber: chosenDay,
+            minutes: chosenMinutes,
+            prayedAt: DateTime.now(),
+          );
 
           await widget.onProjectsUpdated(updated);
           _snack('Added $chosenMinutes min to Day $chosenDay.');
@@ -626,34 +637,26 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                     ),
                   ),
                 ),
-
                 const SizedBox(height: 12),
 
-                // ✅ Batch 7: Streak + History
                 Card(
                   child: Padding(
                     padding: const EdgeInsets.all(12),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'Streak',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                        ),
+                        const Text('Streak',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                         const SizedBox(height: 6),
                         Text('Current: ${current.currentStreak} day(s)'),
                         Text('Best: ${current.bestStreak} day(s)'),
                         const Divider(height: 24),
-                        const Text(
-                          'History',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                        ),
+                        const Text('History',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                         const SizedBox(height: 8),
                         if (historyDays.isEmpty)
-                          const Text(
-                            'No logged days yet.',
-                            style: TextStyle(color: Colors.grey),
-                          )
+                          const Text('No logged days yet.',
+                              style: TextStyle(color: Colors.grey))
                         else
                           ...historyDays.map((d) {
                             final date = _dateForDay(current, d);
@@ -665,9 +668,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                               title: Text('${_fmtDDMMYYYY(date)} (Day $d)'),
                               subtitle: Text('$mins min • $notesCount note(s)'),
                               trailing: const Icon(Icons.chevron_right),
-                              onTap: () {
-                                setState(() => _selectedDay = d);
-                              },
+                              onTap: () => setState(() => _selectedDay = d),
                             );
                           }),
                       ],
@@ -677,17 +678,14 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
 
                 const SizedBox(height: 16),
 
-                // ✅ Batch 8: Calendar Grid (Batch 10 adds day bottom sheet actions)
                 Card(
                   child: Padding(
                     padding: const EdgeInsets.all(12),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'Calendar',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                        ),
+                        const Text('Calendar',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                         const SizedBox(height: 12),
                         _buildCalendarGrid(current),
                       ],
@@ -774,7 +772,6 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
 
                 const SizedBox(height: 16),
 
-                // ✅ Notes section target for Jump-to-notes
                 Card(
                   key: _notesKey,
                   child: Padding(
@@ -787,7 +784,6 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                         ),
                         const SizedBox(height: 10),
-
                         DropdownMenu<int>(
                           initialSelection: (current.prayedDays.contains(_selectedDay))
                               ? _selectedDay
@@ -805,9 +801,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                             if (v != null) setState(() => _selectedDay = v);
                           },
                         ),
-
                         const SizedBox(height: 10),
-
                         TextField(
                           controller: _noteCtrl,
                           decoration: const InputDecoration(
@@ -826,9 +820,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                             label: const Text('Save note'),
                           ),
                         ),
-
                         const SizedBox(height: 10),
-
                         if (availableDays.isEmpty)
                           const Text(
                             'No prayed days yet. Once you record time, days will appear here.',
@@ -871,7 +863,6 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                                             );
 
                                             await widget.onProjectsUpdated(updated);
-
                                             if (mounted) setState(() {});
                                           },
                                         );
@@ -892,13 +883,11 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                                             if (list == null || i < 0 || i >= list.length) return;
 
                                             list.removeAt(i);
-
                                             if (list.isEmpty) {
                                               updated[idx].dayNotes.remove(_selectedDay);
                                             }
 
                                             await widget.onProjectsUpdated(updated);
-
                                             if (mounted) setState(() {});
                                           },
                                         );
