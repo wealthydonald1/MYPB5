@@ -46,7 +46,7 @@ class PrayNowScreen extends StatelessWidget {
   List<PrayerProject> _sortedPrayNowProjects() {
     final list = projects
         .where((p) => !p.isArchived)
-        .where((p) => _isActiveWindow(p)) // ✅ hide upcoming + schedule ended
+        .where((p) => _isActiveWindow(p))
         .toList();
 
     list.sort((a, b) {
@@ -65,34 +65,10 @@ class PrayNowScreen extends StatelessWidget {
     if (s.activeProjectId == null) return true;
     if (s.activeProjectId == p.id) return true;
 
-    // ✅ lock switching while running OR paused-with-progress
     if (s.isRunning) return false;
     if (s.isPaused && s.elapsedSeconds > 0) return false;
 
     return true;
-  }
-
-  Widget _chip(String label, {IconData? icon}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade200,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (icon != null) ...[
-            Icon(icon, size: 14),
-            const SizedBox(width: 6),
-          ],
-          Text(
-            label,
-            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
-          ),
-        ],
-      ),
-    );
   }
 
   @override
@@ -109,15 +85,8 @@ class PrayNowScreen extends StatelessWidget {
 
         final sessionSeconds = (active == null) ? 0 : session.displayedElapsedSeconds;
 
-        final totalSecondsForActive = (active == null)
-            ? 0
-            : (active.totalMinutesPrayed * 60) + sessionSeconds;
-
-        // ✅ Batch 12: today minutes for active project
-        final int activeTodayDay = (active == null) ? 0 : active.dayNumberFor(DateTime.now());
-        final int activeTodayMinutes = (active == null || activeTodayDay < 1)
-            ? 0
-            : (active.dayMinutes[activeTodayDay] ?? 0);
+        final totalSecondsForActive =
+            (active == null) ? 0 : (active.totalMinutesPrayed * 60) + sessionSeconds;
 
         Future<void> stopAndAdd() async {
           if (active == null) return;
@@ -132,17 +101,20 @@ class PrayNowScreen extends StatelessWidget {
 
           final todayDay = updated[idx].dayNumberFor(DateTime.now());
 
-          if (minutesToAdd > 0 && todayDay >= 1 && todayDay <= updated[idx].durationDays) {
+          // ✅ Batch 14: use logMinutes (single source of truth)
+          if (minutesToAdd > 0 &&
+              todayDay >= 1 &&
+              todayDay <= updated[idx].durationDays) {
             updated[idx].logMinutes(
               dayNumber: todayDay,
               minutes: minutesToAdd,
               prayedAt: DateTime.now(),
             );
-          } else if (seconds > 0 && todayDay >= 1 && todayDay <= updated[idx].durationDays) {
-            // if there was activity but no full minute, still mark day prayed
+          } else if (seconds > 0 &&
+              todayDay >= 1 &&
+              todayDay <= updated[idx].durationDays) {
+            // keep old behavior: < 1 min still counts as a prayed day
             updated[idx].markDayPrayed(todayDay);
-            updated[idx].lastPrayedAt = DateTime.now();
-          } else {
             updated[idx].lastPrayedAt = DateTime.now();
           }
 
@@ -201,29 +173,17 @@ class PrayNowScreen extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 6),
-                      if (active != null) ...[
+                      if (active != null)
                         Text(
                           '${active.statusLabel} • Target ${active.targetHours}h • ${(active.progress * 100).toStringAsFixed(0)}%',
-                        ),
-                        const SizedBox(height: 10),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            _chip('Today: ${activeTodayMinutes}m', icon: Icons.today),
-                            _chip('Streak: ${active.currentStreak}', icon: Icons.local_fire_department),
-                            _chip('Notes: ${active.dayNotes[activeTodayDay]?.length ?? 0}', icon: Icons.sticky_note_2_outlined),
-                          ],
-                        ),
-                      ] else
+                        )
+                      else
                         const Text('Tap a project below to select it.'),
                     ],
                   ),
                 ),
               ),
-
               const SizedBox(height: 18),
-
               Center(
                 child: Column(
                   children: [
@@ -240,9 +200,7 @@ class PrayNowScreen extends StatelessWidget {
                   ],
                 ),
               ),
-
               const SizedBox(height: 14),
-
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -257,51 +215,25 @@ class PrayNowScreen extends StatelessWidget {
                   ),
                 ],
               ),
-
               const SizedBox(height: 20),
-
               const Text(
                 'Projects (most recent first)',
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 10),
-
               if (prayNowList.isEmpty)
-                const Text('No active projects right now. (Upcoming/Ended/Archived are hidden here.)')
+                const Text(
+                    'No active projects right now. (Upcoming/Ended/Archived are hidden here.)')
               else
                 ...prayNowList.map((p) {
                   final isSelected = (s.activeProjectId == p.id);
 
-                  final todayDay = p.dayNumberFor(DateTime.now());
-                  final todayMins = (todayDay >= 1 && todayDay <= p.durationDays)
-                      ? (p.dayMinutes[todayDay] ?? 0)
-                      : 0;
-
-                  final todayNotes = (todayDay >= 1 && todayDay <= p.durationDays)
-                      ? (p.dayNotes[todayDay]?.length ?? 0)
-                      : 0;
-
                   return Card(
                     child: ListTile(
                       title: Text(p.title),
-                      subtitle: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '${p.statusLabel} • Day ${p.dayNumberFor(DateTime.now())}/${p.durationDays}\n'
-                            'Target: ${p.targetHours}h • Daily: ${p.dailyTargetHours.toStringAsFixed(1)}h/day',
-                          ),
-                          const SizedBox(height: 8),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: [
-                              _chip('Today: ${todayMins}m', icon: Icons.today),
-                              _chip('Streak: ${p.currentStreak}', icon: Icons.local_fire_department),
-                              _chip('Notes: $todayNotes', icon: Icons.sticky_note_2_outlined),
-                            ],
-                          ),
-                        ],
+                      subtitle: Text(
+                        '${p.statusLabel} • Day ${p.dayNumberFor(DateTime.now())}/${p.durationDays}\n'
+                        'Target: ${p.targetHours}h • Daily: ${p.dailyTargetHours.toStringAsFixed(1)}h/day',
                       ),
                       isThreeLine: true,
                       trailing: isSelected ? const Icon(Icons.check_circle) : null,
